@@ -1,3 +1,5 @@
+# Spotify & SoundCloud Downloader (spotDL Version)
+
 name: "Spotify & SoundCloud Downloader"
 
 on:
@@ -75,44 +77,29 @@ jobs:
             python3 \
             python3-pip
 
-          pip3 install --quiet yt-dlp
+          pip3 install --quiet yt-dlp spotdl
 
       - name: Create Download Folder
         shell: bash
         run: |
           mkdir -p release_files
 
-      - name: Start Downtify Container
-        if: contains(github.event.inputs.media_url, 'spotify.com')
-        shell: bash
-        run: |
-          docker run -d \
-            --name downtify \
-            -p 8000:8000 \
-            ghcr.io/henriquesebastiao/downtify:latest
-
-          echo "Waiting for Downtify startup..."
-          sleep 40
-
-      - name: Debug Downtify Routes
-        if: contains(github.event.inputs.media_url, 'spotify.com')
-        shell: bash
-        run: |
-          echo "Checking available routes..."
-
-          curl -s http://localhost:8000/openapi.json || true
-
       - name: Download Spotify Media
         if: contains(github.event.inputs.media_url, 'spotify.com')
         shell: bash
         run: |
           URL="${{ github.event.inputs.media_url }}"
+          FORMAT="${{ github.event.inputs.output_format }}"
+          QUALITY="${{ github.event.inputs.audio_quality }}"
 
           echo "Spotify detected"
 
-          curl -L \
-            "http://localhost:8000/download?url=$URL" \
-            --output "release_files/spotify_download.mp3"
+          QUALITY_NUMBER=$(echo "$QUALITY" | sed 's/k//')
+
+          spotdl download "$URL" \
+            --output "release_files/{title}.{output-ext}" \
+            --format "$FORMAT" \
+            --bitrate "$QUALITY_NUMBER"k
 
       - name: Download SoundCloud Media
         if: contains(github.event.inputs.media_url, 'soundcloud.com')
@@ -221,5 +208,4 @@ jobs:
         if: always()
         shell: bash
         run: |
-          docker rm -f downtify 2>/dev/null || true
           rm -rf release_files
